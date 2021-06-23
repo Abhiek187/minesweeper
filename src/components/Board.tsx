@@ -1,8 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import '../css/Board.css';
+import { GameState } from './App';
 import Tile from './Tile';
 
-const Board: React.FC = () => {
+type BoardProps = {
+    gameState: GameState,
+    onInitialClick(): void,
+    onGameOver(): void
+};
+
+const Board: React.FC<BoardProps> = ({ gameState, onInitialClick, onGameOver }) => {
     /* Observations:
      * 9x9 easy, 16x16 medium, 30x16 hard
      * first tile has to be 0
@@ -16,6 +23,14 @@ const Board: React.FC = () => {
     const [height, setHeight] = useState<number>(9);
     const [mines, setMines] = useState<number>(Math.floor(width * height * 0.2));
     const [tiles, setTiles] = useState<number[]>(Array(width * height).fill(0));
+    const [hiddenTiles, setHiddenTiles] = useState<boolean[]>(Array(width * height).fill(true));
+
+    useEffect(() => {
+        if (gameState === GameState.Initial) {
+            // Cover the tiles after restarting the game
+            setHiddenTiles(Array(width * height).fill(true));
+        }
+    }, [gameState, width, height]);
 
     const excludeIndices = (arr: number[], exs: number[]): number[] => (
         arr.filter((_, i) => !exs.includes(i))
@@ -82,6 +97,26 @@ const Board: React.FC = () => {
         return indices.slice(0, mines);
     };
 
+    const uncoverTile = (index: number): void => {
+        // Show the selected tile
+        const newHiddenTiles = [...hiddenTiles];
+        newHiddenTiles[index] = false;
+
+        if (tiles[index] === 0) {
+            // Uncover all surrounding spaces if the tile's a 0
+            const adjacentTiles = getAdjacentTiles(index);
+
+            for (const adjacentTile of adjacentTiles) {
+                newHiddenTiles[adjacentTile] = false;
+            }
+        } else if (tiles[index] === -1) {
+            // End the game if a mine is discovered
+            onGameOver();
+        }
+
+        setHiddenTiles(newHiddenTiles); // refresh all the tiles
+    };
+
     const generateBoard = (clickedTile: number): void => {
         // Upon clicking the first tile:
         // 1. Initialize the game board with 0s
@@ -106,7 +141,24 @@ const Board: React.FC = () => {
             }
         }
 
+        // 5. Uncover the selected tile + all surrounding tiles
         setTiles(newTiles);
+        uncoverTile(clickedTile);
+    };
+
+    const determineGameAction = (index: number): void => {
+        // Set the click event depending on the current game state
+        if (gameState === GameState.Initial) {
+            // Set up all the mines and start playing the game
+            generateBoard(index);
+            onInitialClick(); // notify the parent of a change in game state
+        } else if (gameState === GameState.Playing) {
+            // Uncover the tile and check if it's a mine
+            if (hiddenTiles[index]) {
+                uncoverTile(index);
+            }
+        }
+        // Don't do anything if the tile is already revealed or in a game over state
     };
 
     return (
@@ -117,7 +169,12 @@ const Board: React.FC = () => {
             gridTemplateRows: "repeat(auto-fill, 50px)"
         }}>
             {tiles.map((tile, index) =>
-                <Tile key={index} number={tile} onClick={() => generateBoard(index)} />
+                <Tile
+                    key={index}
+                    number={tile}
+                    isHidden={hiddenTiles[index]}
+                    onClick={() => determineGameAction(index)}
+                />
             )}
         </main>
     );
