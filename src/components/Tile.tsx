@@ -2,14 +2,19 @@ import React from 'react';
 import '../css/Tile.css';
 
 type BoardProps = {
-    number: number
+    number: number,
+    onClick: React.MouseEventHandler<HTMLButtonElement>
 };
 
-const Tile: React.FC<BoardProps> = ({ number }) => {
+const Tile: React.FC<BoardProps> = ({ number, onClick }) => {
     return (
-        <div className="mine-tile">
-            {number}
-        </div>
+        <button type="button" className="mine-button" onClick={onClick}>
+            <div className="mine-tile" style={{
+                visibility: number === 0 ? "hidden" : "visible"
+            }}>
+                {number >= 0 ? number : <i className="fas fa-bomb" />}
+            </div>
+        </button>
     );
 };
 
