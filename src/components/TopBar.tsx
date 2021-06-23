@@ -4,10 +4,13 @@ import { GameState } from './App';
 
 type TopBarProps = {
     gameState: GameState,
+    boardWidth: number,
+    boardHeight: number,
+    mines: number,
     onReset: React.MouseEventHandler<HTMLButtonElement>
 };
 
-const TopBar: React.FC<TopBarProps> = ({ gameState, onReset }) => {
+const TopBar: React.FC<TopBarProps> = ({ gameState, boardWidth, boardHeight, mines, onReset }) => {
     const [timer, setTimer] = useState<number>(0);
     const timeInterval = useRef<NodeJS.Timeout>();
 
@@ -18,7 +21,8 @@ const TopBar: React.FC<TopBarProps> = ({ gameState, onReset }) => {
                     setTimer(timer => timer + 1);
                 }, 1000);
                 break;
-            case GameState.GameOver:
+            case GameState.Win:
+            case GameState.Lose:
                 if (timeInterval.current !== undefined) {
                     clearInterval(timeInterval.current);
                 }
@@ -42,10 +46,13 @@ const TopBar: React.FC<TopBarProps> = ({ gameState, onReset }) => {
 
     return (
         <header className="mine-header">
-            <button type="reset" onClick={onReset}>Reset</button>
-            <time>{timerToString()}</time>
-            <p>Size:</p>
-            <p>Mines:</p>
+            <button type="reset" className="reset-button" onClick={onReset}>Reset</button>
+            <time className="timer" style={{
+                color: gameState === GameState.Win ? "green"
+                    : gameState === GameState.Lose ? "red" : "white"
+            }}>{timerToString()}</time>
+            <p className="size-text">Size: {boardWidth}x{boardHeight}</p>
+            <p className="mine-text">Mines: {mines}</p>
         </header>
     );
 };
