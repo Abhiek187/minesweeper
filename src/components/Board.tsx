@@ -126,6 +126,13 @@ const Board: React.FC<BoardProps> = (
 
         if (currentTiles[index] === -1) {
             // Lose the game if a mine is discovered
+            for (let i = 0; i < tiles.length; i++) {
+                // Show where all the other mines are located
+                if (tileStates[i] !== TileState.Open && tiles[i] === -1) {
+                    newTileStates[i] = TileState.Open;
+                }
+            }
+
             onLose();
         } else {
             // Win the game if all the covered tiles are mines
