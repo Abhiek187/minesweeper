@@ -25,6 +25,9 @@ const App: React.FC = () => {
                 boardHeight={height}
                 mines={mines}
                 onReset={() => setGameState(GameState.Initial)}
+                onChangeWidth={newWidth => setWidth(newWidth)}
+                onChangeHeight={newHeight => setHeight(newHeight)}
+                onChangeMines={newMines => setMines(newMines)}
             />
             <Board
                 gameState={gameState}

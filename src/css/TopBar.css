@@ -5,3 +5,15 @@
   align-items: center;
   margin: 1%;
 }
+
+.size-field,
+.mine-field {
+  display: flex;
+  align-items: center;
+}
+
+.size-field > *,
+.mine-field > * {
+  margin-left: 10px;
+  margin-right: 10px;
+}

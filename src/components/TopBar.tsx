@@ -7,10 +7,15 @@ type TopBarProps = {
     boardWidth: number,
     boardHeight: number,
     mines: number,
-    onReset: React.MouseEventHandler<HTMLButtonElement>
+    onReset(): void | React.MouseEventHandler,
+    onChangeWidth(newWidth: number): void,
+    onChangeHeight(newHeight: number): void,
+    onChangeMines(newMines: number): void
 };
 
-const TopBar: React.FC<TopBarProps> = ({ gameState, boardWidth, boardHeight, mines, onReset }) => {
+const TopBar: React.FC<TopBarProps> = (
+    { gameState, boardWidth, boardHeight, mines, onReset, onChangeWidth, onChangeHeight, onChangeMines }
+) => {
     const [timer, setTimer] = useState<number>(0);
     const timeInterval = useRef<NodeJS.Timeout>();
 
@@ -44,15 +49,65 @@ const TopBar: React.FC<TopBarProps> = ({ gameState, boardWidth, boardHeight, min
         return `${mins}:${secs}`;
     };
 
+    const handleInput = (event: React.FormEvent, callback: (newVal: number) => void) => {
+        // Get the input value and call the corresponding set function from the parent
+        const inputElement = event.target as HTMLInputElement;
+        const newVal: number = parseInt(inputElement.value);
+        const min: number = parseInt(inputElement.min);
+        const max: number = parseInt(inputElement.max);
+
+        // Check to make sure the inputs are valid
+        if (isNaN(newVal)) {
+            inputElement.setCustomValidity(`Invalid number: It must be between ${min} and ${max} inclusive.`);
+            return;
+        } else if (newVal < min || newVal > max) {
+            inputElement.setCustomValidity(`Input is out of range: It must be between ${min} and ${max} inclusive.`);
+            return;
+        }
+
+        callback(newVal);
+        onReset(); // restart the game
+    };
+
     return (
         <header className="mine-header">
             <button type="reset" className="reset-button" onClick={onReset}>Reset</button>
+            <button type="button" className="ai-button">AI</button>
             <time className="timer" style={{
                 color: gameState === GameState.Win ? "green"
                     : gameState === GameState.Lose ? "red" : "white"
             }}>{timerToString()}</time>
-            <p className="size-text">Size: {boardWidth}x{boardHeight}</p>
-            <p className="mine-text">Mines: {mines}</p>
+            <div className="size-field">
+                <p>Size: </p>
+                <input
+                    type="number"
+                    className="size-width"
+                    value={boardWidth}
+                    min="4"
+                    max="16"
+                    onChange={event => handleInput(event, onChangeWidth)}
+                />
+                <p>x</p>
+                <input
+                    type="number"
+                    className="size-height"
+                    value={boardHeight}
+                    min="4"
+                    max="16"
+                    onChange={event => handleInput(event, onChangeHeight)}
+                />
+            </div>
+            <div className="mine-field">
+                <p>Mines: </p>
+                <input
+                    type="number"
+                    className="mine-count"
+                    value={mines}
+                    min={Math.floor(boardWidth * boardHeight * 0.1)}
+                    max={Math.floor(boardWidth * boardHeight * 0.3)}
+                    onChange={event => handleInput(event, onChangeMines)}
+                />
+            </div>
         </header>
     );
 };
