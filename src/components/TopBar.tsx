@@ -8,13 +8,14 @@ type TopBarProps = {
     boardHeight: number,
     mines: number,
     onReset(): void | React.MouseEventHandler,
+    onStartAI(): void,
     onChangeWidth(newWidth: number): void,
     onChangeHeight(newHeight: number): void,
     onChangeMines(newMines: number): void
 };
 
 const TopBar: React.FC<TopBarProps> = (
-    { gameState, boardWidth, boardHeight, mines, onReset, onChangeWidth, onChangeHeight, onChangeMines }
+    { gameState, boardWidth, boardHeight, mines, onReset, onStartAI, onChangeWidth, onChangeHeight, onChangeMines }
 ) => {
     const [timer, setTimer] = useState<number>(0);
     const timeInterval = useRef<NodeJS.Timeout>();
@@ -72,7 +73,7 @@ const TopBar: React.FC<TopBarProps> = (
     return (
         <header className="mine-header">
             <button type="reset" className="reset-button" onClick={onReset}>Reset</button>
-            <button type="button" className="ai-button">AI</button>
+            <button type="button" className="ai-button" onClick={onStartAI}>AI</button>
             <time className="timer" style={{
                 color: gameState === GameState.Win ? "green"
                     : gameState === GameState.Lose ? "red" : "white"
