@@ -37,7 +37,17 @@ const Board: React.FC<BoardProps> = (
         arr.filter((_, i) => !exs.includes(i))
     );
 
-    const getAdjacentTiles = (tile: number): number[] => {
+    const shuffleArray = (arr: number[]): number[] => {
+        // Swap each index with a random index
+        for (let i = 0; i < arr.length; i++) {
+            const randI: number = Math.floor(Math.random() * arr.length);
+            [arr[i], arr[randI]] = [arr[randI], arr[i]];
+        }
+
+        return arr;
+    };
+
+    const getAdjacentTiles = useCallback((tile: number): number[] => {
         // Get the x and y position based on the index of the tile
         const [x, y]: [number, number] = [tile % boardWidth, Math.floor(tile / boardWidth)];
         let adjacentTiles: number[] = [
@@ -78,27 +88,17 @@ const Board: React.FC<BoardProps> = (
         }
 
         return adjacentTiles;
-    };
+    }, [boardHeight, boardWidth]);
 
-    const shuffleArray = (arr: number[]): number[] => {
-        // Swap each index with a random index
-        for (let i = 0; i < arr.length; i++) {
-            const randI: number = Math.floor(Math.random() * arr.length);
-            [arr[i], arr[randI]] = [arr[randI], arr[i]];
-        }
-
-        return arr;
-    };
-
-    const placeMines = (excludedTiles: number[]): number[] => {
+    const placeMines = useCallback((excludedTiles: number[]): number[] => {
         // Shuffle the spaces outside the clicked area and return the indices with mines
         let indices: number[] = Array.from(Array(tiles.length).keys());
         indices = indices.filter((_, i) => !excludedTiles.includes(i));
         indices = shuffleArray(indices);
         return indices.slice(0, mines);
-    };
+    }, [mines, tiles.length]);
 
-    const uncoverTile = (index: number, currentTiles: number[] = tiles): void => {
+    const uncoverTile = useCallback((index: number, currentTiles: number[] = tiles): void => {
         // Show the selected tile
         // If this is the first square clicked, currentTiles will reflect what tiles will be after re-rendering
         const newTileStates: TileState[] = [...tileStates];
@@ -137,9 +137,9 @@ const Board: React.FC<BoardProps> = (
         }
 
         setTileStates(newTileStates); // refresh all the tiles
-    };
+    }, [getAdjacentTiles, mines, onLose, onWin, remainingTiles, tileStates, tiles]);
 
-    const generateBoard = (clickedTile: number): void => {
+    const generateBoard = useCallback((clickedTile: number): void => {
         // Upon clicking the first tile:
         // 1. Initialize the game board with 0s
         const size: number = boardWidth * boardHeight;
@@ -166,9 +166,9 @@ const Board: React.FC<BoardProps> = (
         // 5. Uncover the selected tile + all surrounding tiles
         setTiles(newTiles);
         uncoverTile(clickedTile, newTiles);
-    };
+    }, [boardHeight, boardWidth, getAdjacentTiles, placeMines, uncoverTile]);
 
-    const determineGameAction = (index: number): void => {
+    const determineGameAction = useCallback((index: number): void => {
         // Set the click event depending on the current game state
         if (gameState === GameState.Initial) {
             // Set up all the mines and start playing the game
@@ -181,7 +181,7 @@ const Board: React.FC<BoardProps> = (
             }
         }
         // Don't do anything if the tile is already revealed or in a game over state
-    };
+    }, [gameState, generateBoard, onInitialClick, tileStates, uncoverTile]);
 
     const flagTile = (event: React.MouseEvent, index: number): void => {
         // Don't show the right click menu
@@ -195,8 +195,6 @@ const Board: React.FC<BoardProps> = (
         }
     };
 
-    //const wait = (seconds: number): Promise<unknown> => new Promise(res => setTimeout(res, seconds));
-
     const startAgent = useCallback((): void => {
         // Start by clicking a random tile
         if (gameState === GameState.Initial) {
@@ -207,8 +205,6 @@ const Board: React.FC<BoardProps> = (
 
         // Repeat until the agent wins or loses
         if (gameState !== GameState.Playing) return;
-        // Show each move every second
-        //await wait(1);
 
         // If the agent has to make a guess, generate a probability map of encountering a mine for each uncovered tile
         const mineProbs: number[] = Array(tiles.length).fill(-1);
@@ -308,18 +304,17 @@ const Board: React.FC<BoardProps> = (
     }, [boardWidth, determineGameAction, gameState, getAdjacentTiles, mines, remainingTiles, tileStates, tiles, uncoverTile]);
 
     useEffect(() => {
-        if (gameState === GameState.Initial) {
+        if (gameState === GameState.Initial &&
+            (tileStates.length !== tiles.length || remainingTiles !== tiles.length)) {
             // Cover the tiles after restarting the game
             setTileStates(Array(tiles.length).fill(TileState.Hidden));
             setRemainingTiles(tiles.length);
         }
 
-        // let timeout: NodeJS.Timeout;
-
         if (isAI) {
             startAgent();
         }
-    }, [gameState, tiles.length, isAI, startAgent]);
+    }, [gameState, tiles.length, tileStates.length, remainingTiles, isAI, startAgent]);
 
     return (
         <main className="mine-board" style={{
