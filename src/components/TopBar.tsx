@@ -41,6 +41,13 @@ const TopBar: React.FC<TopBarProps> = (
 
                 setTimer(0);
         }
+
+        // Clear any intervals if they're still running
+        return () => {
+            if (timeInterval.current !== undefined) {
+                clearInterval(timeInterval.current);
+            }
+        };
     }, [gameState]);
 
     const timerToString = (): string => {
@@ -79,19 +86,19 @@ const TopBar: React.FC<TopBarProps> = (
                     : gameState === GameState.Lose ? "red" : "white"
             }}>{timerToString()}</time>
             <div className="size-field">
-                <p>Size: </p>
+                <label htmlFor="size-width">Size: </label>
                 <input
                     type="number"
-                    className="size-width"
+                    id="size-width"
                     value={boardWidth}
                     min="4"
                     max="16"
                     onChange={event => handleInput(event, onChangeWidth)}
                 />
-                <p>x</p>
+                <label htmlFor="size-height">x</label>
                 <input
                     type="number"
-                    className="size-height"
+                    id="size-height"
                     value={boardHeight}
                     min="4"
                     max="16"
@@ -99,10 +106,10 @@ const TopBar: React.FC<TopBarProps> = (
                 />
             </div>
             <div className="mine-field">
-                <p>Mines: </p>
+                <label htmlFor="mine-count">Mines: </label>
                 <input
                     type="number"
-                    className="mine-count"
+                    id="mine-count"
                     value={mines}
                     min={Math.floor(boardWidth * boardHeight * 0.1)}
                     max={Math.floor(boardWidth * boardHeight * 0.3)}

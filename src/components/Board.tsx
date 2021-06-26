@@ -304,17 +304,23 @@ const Board: React.FC<BoardProps> = (
     }, [boardWidth, determineGameAction, gameState, getAdjacentTiles, mines, remainingTiles, tileStates, tiles, uncoverTile]);
 
     useEffect(() => {
-        if (gameState === GameState.Initial &&
-            (tileStates.length !== tiles.length || remainingTiles !== tiles.length)) {
-            // Cover the tiles after restarting the game
-            setTileStates(Array(tiles.length).fill(TileState.Hidden));
-            setRemainingTiles(tiles.length);
+        if (gameState === GameState.Initial) {
+            if (tiles.length !== boardWidth * boardHeight) {
+                // Initialize a new set of tiles if the size changes
+                setTiles(Array(boardWidth * boardHeight).fill(0));
+            }
+
+            if (remainingTiles !== tiles.length) {
+                // Cover the tiles after restarting the game
+                setTileStates(Array(tiles.length).fill(TileState.Hidden));
+                setRemainingTiles(tiles.length);
+            }
         }
 
         if (isAI) {
             startAgent();
         }
-    }, [gameState, tiles.length, tileStates.length, remainingTiles, isAI, startAgent]);
+    }, [gameState, boardWidth, boardHeight, tiles.length, remainingTiles, isAI, startAgent]);
 
     return (
         <main className="mine-board" style={{
