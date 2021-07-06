@@ -14,6 +14,12 @@ type BoardProps = {
     onLose(): void
 };
 
+type MineTile = {
+    number: number, // number of surrounding mines
+    state: TileState, // whether the tile is open, closed, or flagged
+    prob: number // probability of a mine being present (for the agent)
+};
+
 const Board: React.FC<BoardProps> = (
     { gameState, isAI, boardWidth, boardHeight, mines, onInitialClick, onWin, onLose }
 ) => {
@@ -26,12 +32,11 @@ const Board: React.FC<BoardProps> = (
      * flag tiles w/ 100% chance of mine
      * choose tiles w/ lowest chance of mine
      */
-    const [tiles, setTiles] = useState<number[]>(Array(boardWidth * boardHeight).fill(0));
-    const [tileStates, setTileStates] = useState<TileState[]>(
-        Array(tiles.length).fill(TileState.Hidden)
-    );
-    // # of uncovered tiles
-    const [remainingTiles, setRemainingTiles] = useState<number>(tiles.length);
+    const [tiles, setTiles] = useState<MineTile[]>([...Array(boardWidth * boardHeight)].map(_ => ({
+        number: 0,
+        state: TileState.Hidden,
+        prob: -1
+    })));
 
     const excludeIndices = (arr: number[], exs: number[]): number[] => (
         arr.filter((_, i) => !exs.includes(i))
@@ -93,57 +98,52 @@ const Board: React.FC<BoardProps> = (
     const placeMines = useCallback((excludedTiles: number[]): number[] => {
         // Shuffle the spaces outside the clicked area and return the indices with mines
         let indices: number[] = Array.from(Array(tiles.length).keys());
-        indices = indices.filter((_, i) => !excludedTiles.includes(i));
+        indices = excludeIndices(indices, excludedTiles);
         indices = shuffleArray(indices);
         return indices.slice(0, mines);
     }, [mines, tiles.length]);
 
-    const uncoverTile = useCallback((index: number, currentTiles: number[] = tiles): void => {
+    const uncoverTile = useCallback((index: number, currentTiles: MineTile[] = tiles): void => {
         // Show the selected tile
         // If this is the first square clicked, currentTiles will reflect what tiles will be after re-rendering
-        const newTileStates: TileState[] = [...tileStates];
-        newTileStates[index] = TileState.Open;
-        let tilesOpened: number = 1;
+        const newTiles: MineTile[] = [...currentTiles]; // copy an array of objects
+        newTiles[index].state = TileState.Open;
 
-        if (currentTiles[index] === 0) {
+        if (currentTiles[index].number === 0) {
             // Uncover all surrounding spaces if the tile's a 0
             const adjacentTiles: number[] = getAdjacentTiles(index);
 
             for (const adjacentTile of adjacentTiles) {
-                if (newTileStates[adjacentTile] !== TileState.Open) {
-                    newTileStates[adjacentTile] = TileState.Open;
-                    tilesOpened++; // don't count the tiles that are already opened
-                }
+                newTiles[adjacentTile].state = TileState.Open;
             }
         }
 
-        if (currentTiles[index] === -1) {
+        if (currentTiles[index].number === -1) {
             // Lose the game if a mine is discovered
             for (let i = 0; i < tiles.length; i++) {
                 // Show where all the other mines are located
-                if (tileStates[i] !== TileState.Open && tiles[i] === -1) {
-                    newTileStates[i] = TileState.Open;
+                if (tiles[i].state !== TileState.Open && tiles[i].number === -1) {
+                    newTiles[i].state = TileState.Open;
                 }
             }
 
             onLose();
         } else {
             // Win the game if all the covered tiles are mines
-            if (remainingTiles - tilesOpened === mines) {
+            const remainingTiles: number = newTiles.filter(tile => tile.state !== TileState.Open).length;
+
+            if (remainingTiles === mines) {
                 onWin();
             }
-
-            setRemainingTiles(remainingTiles - tilesOpened);
         }
 
-        setTileStates(newTileStates); // refresh all the tiles
-    }, [getAdjacentTiles, mines, onLose, onWin, remainingTiles, tileStates, tiles]);
+        setTiles(newTiles); // refresh all the tiles
+    }, [getAdjacentTiles, mines, onLose, onWin, tiles]);
 
     const generateBoard = useCallback((clickedTile: number): void => {
         // Upon clicking the first tile:
         // 1. Initialize the game board with 0s
-        const size: number = boardWidth * boardHeight;
-        const newTiles: number[] = Array<number>(size).fill(0);
+        const newTiles: MineTile[] = [...tiles];
         // 2. Shuffle the spaces, excluding the clicked tile and its adjacent tiles
         const excludedTiles: number[] = getAdjacentTiles(clickedTile);
         excludedTiles.push(clickedTile);
@@ -151,47 +151,52 @@ const Board: React.FC<BoardProps> = (
 
         // 3. Place mines on the first x tiles, record the indices
         for (const badTile of badTiles) {
-            newTiles[badTile] = -1;
+            newTiles[badTile].number = -1;
         }
 
         // 4. For each mine, increment the counts on all the safe adjacent spaces
         for (const badTile of badTiles) {
             for (const adjacentTile of getAdjacentTiles(badTile)) {
-                if (newTiles[adjacentTile] !== -1) {
-                    newTiles[adjacentTile]++;
+                if (newTiles[adjacentTile].number !== -1) {
+                    newTiles[adjacentTile].number++;
                 }
             }
         }
 
         // 5. Uncover the selected tile + all surrounding tiles
-        setTiles(newTiles);
         uncoverTile(clickedTile, newTiles);
-    }, [boardHeight, boardWidth, getAdjacentTiles, placeMines, uncoverTile]);
+    }, [getAdjacentTiles, placeMines, tiles, uncoverTile]);
 
     const determineGameAction = useCallback((index: number): void => {
         // Set the click event depending on the current game state
         if (gameState === GameState.Initial) {
+            // Make sure the number of mines is between 10% and 30% of the board's size
+            if (mines < Math.floor(tiles.length * 0.1) || mines > Math.floor(tiles.length * 0.3)) {
+                onLose(); // force the agent to stop
+                return;
+            }
+
             // Set up all the mines and start playing the game
             generateBoard(index);
             onInitialClick(); // notify the parent of a change in game state
         } else if (gameState === GameState.Playing) {
             // Uncover the tile and check if it's a mine (don't accidently click a flagged space)
-            if (tileStates[index] === TileState.Hidden) {
+            if (tiles[index].state === TileState.Hidden) {
                 uncoverTile(index);
             }
         }
         // Don't do anything if the tile is already revealed or in a game over state
-    }, [gameState, generateBoard, onInitialClick, tileStates, uncoverTile]);
+    }, [gameState, generateBoard, mines, onInitialClick, onLose, tiles, uncoverTile]);
 
     const flagTile = (event: React.MouseEvent, index: number): void => {
         // Don't show the right click menu
         event.preventDefault();
         // Toggle the flag state on an uncovered tile while playing
-        if (gameState === GameState.Playing && tileStates[index] !== TileState.Open) {
-            const newTileStates: TileState[] = [...tileStates];
-            newTileStates[index] =
-                newTileStates[index] === TileState.Hidden ? TileState.Flagged : TileState.Hidden;
-            setTileStates(newTileStates);
+        if (gameState === GameState.Playing && tiles[index].state !== TileState.Open) {
+            const newTiles: MineTile[] = [...tiles];
+            newTiles[index].state =
+                newTiles[index].state === TileState.Hidden ? TileState.Flagged : TileState.Hidden;
+            setTiles(newTiles);
         }
     };
 
@@ -207,20 +212,20 @@ const Board: React.FC<BoardProps> = (
         if (gameState !== GameState.Playing) return;
 
         // If the agent has to make a guess, generate a probability map of encountering a mine for each uncovered tile
-        const mineProbs: number[] = Array(tiles.length).fill(-1);
+        const newTiles: MineTile[] = tiles.map(tile => ({ ...tile, prob: -1 }));
 
         // Look at all the uncovered tiles
         for (let i = 0; i < tiles.length; i++) {
-            if (tileStates[i] === TileState.Open) {
+            if (tiles[i].state === TileState.Open) {
                 // Look for any situations where
                 // (# of the tile - # of adjacent flagged tiles)/(# of adjacent uncovered (non-flagged) tiles) = 0 or 1
                 const adjacentTiles: number[] = getAdjacentTiles(i);
-                const tileNum: number = tiles[i];
+                const tileNum: number = tiles[i].number;
                 const adjacentFlaggedTiles: number = adjacentTiles.filter(
-                    index => tileStates[index] === TileState.Flagged
+                    index => tiles[index].state === TileState.Flagged
                 ).length;
                 const adjacentHiddenTiles: number = adjacentTiles.filter(
-                    index => tileStates[index] === TileState.Hidden
+                    index => tiles[index].state === TileState.Hidden
                 ).length;
 
                 if (adjacentHiddenTiles === 0) continue; // skip tiles without new information
@@ -235,26 +240,24 @@ const Board: React.FC<BoardProps> = (
 
                 if (mineOdds === 1) {
                     // If the probability is 1, flag the adjacent tiles
-                    const newTileStates: TileState[] = [...tileStates];
-
                     for (const adjacentTile of adjacentTiles) {
-                        if (tileStates[adjacentTile] === TileState.Hidden) {
-                            newTileStates[adjacentTile] = TileState.Flagged;
+                        if (tiles[adjacentTile].state === TileState.Hidden) {
+                            newTiles[adjacentTile].state = TileState.Flagged;
                             console.log(`P = 1: Flagging R${Math.floor(adjacentTile / boardWidth)}, C${adjacentTile % boardWidth}`);
                             // Calculate the amount of mines gotten
-                            const flaggedTiles: number = tiles.filter(
-                                (_, index) => newTileStates[index] === TileState.Flagged
+                            const flaggedTiles: number = newTiles.filter(
+                                newTile => newTile.state === TileState.Flagged
                             ).length;
                             console.log(`${flaggedTiles}/${mines} mines flagged (${Math.round(flaggedTiles / mines * 100)}%)`);
                         }
                     }
 
-                    setTileStates(newTileStates);
+                    setTiles(newTiles);
                     return;
                 } else if (mineOdds === 0) {
                     // If the probability is 0, uncover the adjacent tiles
                     for (const adjacentTile of adjacentTiles) {
-                        if (tileStates[adjacentTile] === TileState.Hidden) {
+                        if (tiles[adjacentTile].state === TileState.Hidden) {
                             uncoverTile(adjacentTile);
                             console.log(`P = 0: Clicking on R${Math.floor(adjacentTile / boardWidth)}, C${adjacentTile % boardWidth}`);
                         }
@@ -262,20 +265,21 @@ const Board: React.FC<BoardProps> = (
 
                     return;
                 } else {
-                    // Update the probabilities if it increases due to some other tile or is guaranteed to be safe
+                    // Update the probability if it increases due to some other tile or is guaranteed to be safe
                     for (const adjacentTile of adjacentTiles) {
-                        if (tileStates[adjacentTile] === TileState.Hidden && mineOdds > mineProbs[adjacentTile]) {
-                            mineProbs[adjacentTile] = mineOdds;
+                        if (tiles[adjacentTile].state === TileState.Hidden && mineOdds > newTiles[adjacentTile].prob) {
+                            newTiles[adjacentTile].prob = mineOdds;
                         }
                     }
                 }
-            } else if (tileStates[i] === TileState.Hidden && mineProbs[i] === -1) {
+            } else if (tiles[i].state === TileState.Hidden && newTiles[i].prob === -1) {
                 // For the remaining covered tiles that aren't adjacent to an uncovered tile, set their probability as (# of mines remaining)/(# of uncovered (non-flagged) tiles)
                 const flaggedTiles: number = tiles.filter(
-                    (_, index) => tileStates[index] === TileState.Flagged
+                    tile => tile.state === TileState.Flagged
                 ).length;
                 const minesRemaining: number = mines - flaggedTiles;
-                mineProbs[i] = minesRemaining / remainingTiles;
+                const remainingTiles: number = newTiles.filter(tile => tile.state !== TileState.Open).length;
+                newTiles[i].prob = minesRemaining / remainingTiles;
             }
         }
 
@@ -283,15 +287,15 @@ const Board: React.FC<BoardProps> = (
         let minProb: number = 1;
         let safestTiles: number[] = [];
 
-        for (let i = 0; i < mineProbs.length; i++) {
+        for (let i = 0; i < tiles.length; i++) {
             // Compare floats using epsilon
             if (
-                mineProbs[i] !== -1 &&
-                Math.abs(mineProbs[i] - minProb) < Number.EPSILON
+                newTiles[i].prob !== -1 &&
+                Math.abs(newTiles[i].prob - minProb) < Number.EPSILON
             ) {
                 safestTiles.push(i);
-            } else if (mineProbs[i] !== -1 && mineProbs[i] < minProb) {
-                minProb = mineProbs[i];
+            } else if (newTiles[i].prob !== -1 && newTiles[i].prob < minProb) {
+                minProb = newTiles[i].prob;
                 safestTiles = [i];
             }
         }
@@ -301,26 +305,24 @@ const Board: React.FC<BoardProps> = (
         const randTile: number = safestTiles[Math.floor(Math.random() * safestTiles.length)];
         uncoverTile(randTile);
         console.log(`Guess: Clicking on R${Math.floor(randTile / boardWidth)}, C${randTile % boardWidth}`);
-    }, [boardWidth, determineGameAction, gameState, getAdjacentTiles, mines, remainingTiles, tileStates, tiles, uncoverTile]);
+    }, [boardWidth, determineGameAction, gameState, getAdjacentTiles, mines, tiles, uncoverTile]);
 
     useEffect(() => {
-        if (gameState === GameState.Initial) {
-            if (tiles.length !== boardWidth * boardHeight) {
-                // Initialize a new set of tiles if the size changes
-                setTiles(Array(boardWidth * boardHeight).fill(0));
-            }
+        const coveredTiles: number = tiles.filter(tile => tile.state === TileState.Hidden).length;
 
-            if (remainingTiles !== tiles.length) {
-                // Cover the tiles after restarting the game
-                setTileStates(Array(tiles.length).fill(TileState.Hidden));
-                setRemainingTiles(tiles.length);
-            }
+        if (gameState === GameState.Initial && coveredTiles !== boardWidth * boardHeight) {
+            // Initialize a new set of tiles if the size changes or the game has restarted
+            setTiles([...Array(boardWidth * boardHeight)].map(_ => ({
+                number: 0,
+                state: TileState.Hidden,
+                prob: -1
+            })));
         }
 
         if (isAI) {
             startAgent();
         }
-    }, [gameState, boardWidth, boardHeight, tiles.length, remainingTiles, isAI, startAgent]);
+    }, [tiles, gameState, boardWidth, boardHeight, isAI, startAgent]);
 
     return (
         <main className="mine-board" style={{
@@ -332,8 +334,8 @@ const Board: React.FC<BoardProps> = (
             {tiles.map((tile, index) =>
                 <Tile
                     key={index}
-                    number={tile}
-                    state={tileStates[index]}
+                    number={tile.number}
+                    state={tile.state}
                     onClick={() => determineGameAction(index)}
                     onRightClick={(event) => flagTile(event, index)}
                 />
