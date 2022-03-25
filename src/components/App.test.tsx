@@ -1,5 +1,6 @@
-import { act, fireEvent, render, screen } from '@testing-library/react';
-import App from './App';
+/* eslint-disable testing-library/no-node-access */
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import App from "./App";
 
 let titleHeading: HTMLHeadingElement;
 let resetButton: HTMLButtonElement;
@@ -12,6 +13,7 @@ let mineTiles: HTMLButtonElement[];
 
 beforeEach(() => {
   // Load App and all its elements
+  // eslint-disable-next-line testing-library/no-render-in-setup
   render(<App />);
 
   titleHeading = screen.getByText(/minesweeper/i) as HTMLHeadingElement; // ignore case
@@ -48,9 +50,7 @@ describe("the initial game state", () => {
   });
 
   test("reset button does nothing", () => {
-    act(() => {
-      fireEvent.click(resetButton);
-    });
+    fireEvent.click(resetButton);
 
     // Check that all the starting values remain as is
     expect(timer.style.color).toBe("white");
@@ -60,21 +60,24 @@ describe("the initial game state", () => {
     expect(mineTiles.length).toBe(81); // width * height
 
     for (const tile of mineTiles) {
-      expect(tile.parentElement?.style.backgroundColor).toBe("rgb(237, 237, 237)");
+      expect(tile.parentElement?.style.backgroundColor).toBe(
+        "rgb(237, 237, 237)"
+      );
       expect(tile.style.visibility).toBe("hidden");
     }
   });
 
   test("AI wins or loses the game", () => {
-    jest.spyOn(console, "log").mockImplementation(() => { }); // don't print the console logs
-
-    act(() => {
-      fireEvent.click(aiButton);
-    });
+    jest.spyOn(console, "log").mockImplementation(() => {}); // don't print the console logs
+    fireEvent.click(aiButton);
 
     // Check for a winning or losing scenario
-    expect(timer.style.color === "red" || timer.style.color === "green").toBeTruthy();
-    expect(mineTiles.filter(tile => tile.style.visibility === "visible").length).toBeGreaterThan(0);
+    expect(
+      timer.style.color === "red" || timer.style.color === "green"
+    ).toBeTruthy();
+    expect(
+      mineTiles.filter((tile) => tile.style.visibility === "visible").length
+    ).toBeGreaterThan(0);
 
     // Check that the board can't be clicked
     const oldTileStyle: CSSStyleDeclaration = mineTiles[0].style;
@@ -89,6 +92,7 @@ describe("clicking tiles", () => {
   beforeEach(() => {
     // Use a fake timer to track the timer
     jest.useFakeTimers();
+    jest.spyOn(global, "setInterval");
   });
 
   afterEach(() => {
@@ -97,19 +101,24 @@ describe("clicking tiles", () => {
   });
 
   const testTiles = (tile: number, neighbors: number[]): void => {
+    fireEvent.click(mineTiles[tile]);
     act(() => {
-      fireEvent.click(mineTiles[tile]);
       jest.runOnlyPendingTimers();
     });
 
     // Check that a second passed and all the surrounding tiles are open
-    expect(setInterval).toHaveBeenCalled();
+    // toHaveBeenCalled() doesn't work with setInterval
+    expect(setInterval).toHaveBeenCalledTimes(1);
     expect(setInterval).toHaveBeenLastCalledWith(expect.any(Function), 1000);
     expect(mineTiles[tile]).toHaveTextContent("0");
-    expect(mineTiles[tile].parentElement?.style.backgroundColor).toBe("rgb(149, 149, 149)");
+    expect(mineTiles[tile].parentElement?.style.backgroundColor).toBe(
+      "rgb(149, 149, 149)"
+    );
 
     for (const neighbor of neighbors) {
-      expect(mineTiles[neighbor].parentElement?.style.backgroundColor).toBe("rgb(149, 149, 149)");
+      expect(mineTiles[neighbor].parentElement?.style.backgroundColor).toBe(
+        "rgb(149, 149, 149)"
+      );
     }
   };
 
@@ -152,8 +161,8 @@ describe("clicking tiles", () => {
 
 describe("changing the inputs", () => {
   test("increasing the width increases the number of tiles", () => {
-    act(() => {
-      fireEvent.change(widthInput, { target: { min: "4", value: "10", max: "16" } });
+    fireEvent.change(widthInput, {
+      target: { min: "4", value: "10", max: "16" },
     });
 
     // Re-fetch all the tiles
@@ -163,8 +172,8 @@ describe("changing the inputs", () => {
   });
 
   test("decreasing the height decreases the number of tiles", () => {
-    act(() => {
-      fireEvent.change(heightInput, { target: { min: "4", value: "8", max: "16" } });
+    fireEvent.change(heightInput, {
+      target: { min: "4", value: "8", max: "16" },
     });
 
     mineTiles = screen.getAllByText("0") as HTMLButtonElement[];
@@ -173,8 +182,8 @@ describe("changing the inputs", () => {
   });
 
   test("changing the number of mines doesn't change the number of tiles", () => {
-    act(() => {
-      fireEvent.change(mineInput, { target: { min: "8", value: "20", max: "24" } });
+    fireEvent.change(mineInput, {
+      target: { min: "8", value: "20", max: "24" },
     });
 
     mineTiles = screen.getAllByText("0") as HTMLButtonElement[];
@@ -183,8 +192,8 @@ describe("changing the inputs", () => {
   });
 
   test("non-numbers aren't accepted", () => {
-    act(() => {
-      fireEvent.change(widthInput, { target: { min: "4", value: "cheese257", max: "16" } });
+    fireEvent.change(widthInput, {
+      target: { min: "4", value: "cheese257", max: "16" },
     });
 
     mineTiles = screen.getAllByText("0") as HTMLButtonElement[];
@@ -193,8 +202,8 @@ describe("changing the inputs", () => {
   });
 
   test("numbers out of range aren't accepted", () => {
-    act(() => {
-      fireEvent.change(mineInput, { target: { min: "8", value: "50", max: "24" } });
+    fireEvent.change(mineInput, {
+      target: { min: "8", value: "50", max: "24" },
     });
 
     mineTiles = screen.getAllByText("0") as HTMLButtonElement[];
