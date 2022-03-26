@@ -42,9 +42,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - uses: actions/setup-node@v3
-        with:
-          node-version: 16.x
-
       - run: npm ci
-      - run: npm run deploy
+      - run: npm run build
+
+      - uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages # the branch the action should deploy to
+          folder: build # the folder the action should deploy
