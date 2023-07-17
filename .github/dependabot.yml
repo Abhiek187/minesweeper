@@ -11,6 +11,10 @@ updates:
     # Check the npm registry for updates every week (on Mondays)
     schedule:
       interval: "monthly"
+    groups:
+      types:
+        patterns:
+          - "@types/*"
 
   # Maintain dependencies for GitHub Actions
   - package-ecosystem: "github-actions"
