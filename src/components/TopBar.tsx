@@ -18,7 +18,7 @@ const TopBar: React.FC<TopBarProps> = (
     { gameState, boardWidth, boardHeight, mines, onReset, onStartAI, onChangeWidth, onChangeHeight, onChangeMines }
 ) => {
     const [timer, setTimer] = useState<number>(0);
-    const timeInterval = useRef<NodeJS.Timeout>();
+    const timeInterval = useRef<NodeJS.Timeout>(undefined);
 
     useEffect(() => {
         switch (gameState) {
